@@ -230,13 +230,13 @@ def fillingA(amp,A,dimension,dx,mode='n**2',bound='not',axes=0,axesr=0, Runge_Ku
             for R in range(1,M+1):
                 for j in range(0,nbl):
                     for i in range(0,up-step*R):
-                        A1[i+j*up,i+j*up+step*R]+=-1j*amp/dx[axes]/2*popravka[R-1]
-                        A1[i+j*up+step*R,i+j*up]+=1j*amp/dx[axes]/2*popravka[R-1]
+                        A1[i+j*up,i+j*up+step*R]+=-1j*amp/dx[axes]*popravka[R-1]
+                        A1[i+j*up+step*R,i+j*up]+=1j*amp/dx[axes]*popravka[R-1]
                 if(bound=='periodic'):
                     for j in range(0,nbl):
                         for i in range(up-step*R,up):
-                            A1[i+j*up,i+j*up+step*R-up]+=-1j*amp/dx[axes]/2*popravka[R-1]
-                            A1[i+j*up+step*R-up,i+j*up]+=1j*amp/dx[axes]/2*popravka[R-1]
+                            A1[i+j*up,i+j*up+step*R-up]+=-1j*amp/dx[axes]*popravka[R-1]
+                            A1[i+j*up+step*R-up,i+j*up]+=1j*amp/dx[axes]*popravka[R-1]
                         
     # n**2 is -d2/dfi^2
     if(mode=='n**2'):
@@ -260,7 +260,7 @@ def fillingA(amp,A,dimension,dx,mode='n**2',bound='not',axes=0,axesr=0, Runge_Ku
         else:
             (popravka,M) = Runge_Kutta_coefs(pr = 2, M = Runge_Kutta)
             for i in range(0,A1.shape[0]):
-                A1[i,i]+=amp/dx[axes]**2*popravka[0]
+                A1[i,i]+=-amp/dx[axes]**2*popravka[0]
             for R in range(1,M):
                 for j in range(0,nbl):
                     for i in range(0,up-step*R):
