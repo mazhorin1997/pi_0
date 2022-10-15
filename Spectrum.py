@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[3]:
-
-
 import matplotlib.pyplot as plt
 import numpy as np
 import math as math
@@ -14,9 +8,6 @@ from numpy.linalg import inv,norm,eig
 from numpy import linspace,cos,shape,tensordot,einsum,diag,kron
 from math import pi
 from copy import copy
-
-
-# In[1]:
 
 
 # Заполнение матрицы ёмкостей или индуктивностей
@@ -34,8 +25,6 @@ def filling(number):
     return C
 
 
-# In[2]:
-
 
 # Замена базиса в матрице
 def change(C):
@@ -43,17 +32,11 @@ def change(C):
     return C1
 
 
-# In[4]:
-
 
 # Замена базиса в обратной матрице
 def changeinv(C):
     C1=tensordot(tensordot(inv(pot),C,axes=1),inv(pot.transpose()),axes=1)
     return C1
-
-
-# In[5]:
-
 
 # Определение джозефсоновской энерии
 def Jsph(number):
@@ -69,15 +52,13 @@ def Jsph(number):
     return fj1
 
 
-# In[6]:
 
-
-# Привидение двух квадратичных форм к диаональному виду
-# Схема такая:
-# C-diag-E-E
-# L-L'-L''-diag
-# E-S-S-S''
 def bidiag(C,L):
+    """Привидение двух квадратичных форм к диаональному виду
+    Схема такая:
+    C-diag-E-E
+    L-L'-L''-diag
+    E-S-S-S''"""
     global pot
     S1=diag(linspace(1,1,degrees))
     (C1,pot)=eig(C)
@@ -103,6 +84,7 @@ def bidiag(C,L):
 
 def dividing(degrees,a,b,period,dim):
     """Построение разбиения
+    period = 0 для не периодического потенциала, 1 для периодического 
     """
     b1=copy(b)
     h=np.zeros(degrees)
@@ -146,11 +128,12 @@ def findoscillator():
     return osc
 
 
-# In[125]:
 
 
-# Построение элемента базиса всей цепочки(используется для построения базиса всей цепочки)
 def bvector(i,degrees,dim,a,b):
+    """
+    Построение элемента базиса всей цепочки(используется для построения базиса всей цепочки)
+    """
     fi=1
     for j in range (0,degrees):
             if(i==j):
@@ -160,11 +143,11 @@ def bvector(i,degrees,dim,a,b):
     return fi
 
 
-# In[126]:
 
-
-# Построение базиса всей цепочки 
 def basis(degrees,dim,a,b):
+    """
+    Построение базиса всей цепочки
+    """
     N=1
     for i in range (0,degrees):
         N=int(N*dim[i])
@@ -173,23 +156,48 @@ def basis(degrees,dim,a,b):
         fi[:,i]=bvector(i,degrees,dim,a,b)
     return fi,N
 
-
-# In[372]:
-
-
-def fillingA(amp,A,dimension,dx,mode='n**2',bound='not',axes=0,axesr=0):
+def Runge_Kutta_coefs(pr = 1, M=1):
     """
-    calculate matrix in flux basis for n^2, n*nr (where nr - charge for resonator), n, periodic and nonperiodic conditions, 
+    pr - какая производная приближается,
+    M - до какого порядка (порядок по дефолту выбирается минимальным),
+    
+    Идея такая:нечетные производные расскладываются по разности функций +дельта и -дельта,
+    четные - по сумме и не сдвинутой функции"""
+    M = max(M, pr//2+1)
+    b = np.asarray([0]*(pr//2)+[math.factorial(pr)/2]+[0]*(M-pr//2-1))
+    n = np.linspace(1,M,M)
+    A = []
+    for i in range(0,M):
+        if pr%2 == 1:
+            A.append(n**(2*i+1))
+        else:
+            A.append((n-1)**(2*i))
+    A=np.asarray(A)
+    # так как расскладываются по сумме смещенных функций, то не смещенную надо поделить на два
+    if pr%2 == 0:
+        A[0,0] = 0.5
+    return (np.linalg.solve(A,b),M)
+
+
+def fillingA(amp,A,dimension,dx,mode='n**2',bound='not',axes=0,axesr=0, Runge_Kutta = None):
+    """
+    calculate matrix in flux basis for n^2, n*nr (where nr - charge for resonator), n or cos(phi) and cos(phi_1-phi_2) in charge basis, periodic and nonperiodic conditions,
     for different axeses and axes for resonator(axesr),
+    n is -1j*d/dfi
+    n**2 is -d2/dfi^2
+    n*nr here is d/dfi*(a^+-a)
+    n1*n2 here is -d2/dfi1dfi2
+    cos(phi)psi(i)=(psi(i+1)+psi(i-1))/2
+    cos(phi_1-phi_2)psi(i,j)=(psi(i+1,j-1)+psi(i-1,j+1))/2
+    Runge_Kutta - какой порядок метода Рунге-Кутта используется, если None, то минимальный
     """
     if bound!='not' and bound!='periodic' :
         print("wrong bounds, bounds should be not or periodic")
         return None
-    if(amp!=abs(amp) and amp!=-abs(amp)):
-        print('For amp should be real to make the hamiltonian hermitian')
-        return None
-    if(mode!='n**2'and mode!='n' and mode!='n*nr'):
-        print('Wrong mode: mode should be n**2 or n or n*nr')
+    if(amp!=abs(amp) and amp!=-abs(amp) and mode!='cos(phi)' and mode!='cos(phi_1-phi_2)'):
+        print('Warning: For flux basis amp should be real to make the hamiltonian hermitian')
+    if(mode!='n**2'and mode!='n' and mode!='n*nr' and mode!='cos(phi)' and mode!='cos(phi_1-phi_2)' and mode!='n1*n2'):
+        print('Wrong mode: mode should be n**2 or n or n*nr or cos(phi) or cos(phi_1-phi_2)')
         return None
     A1=copy(A)
     # step to describe displacemant of axes's coordinate
@@ -207,34 +215,64 @@ def fillingA(amp,A,dimension,dx,mode='n**2',bound='not',axes=0,axesr=0):
             up=int(up*dimension[-i-1])
         # nbl - number of these blocks
         nbl=A1.shape[0]//up
-        for j in range(0,nbl):
-            for i in range(0,up-step):
-                A1[i+j*up,i+j*up+step]+=-1j*amp/dx[axes]
-                A1[i+j*up+step,i+j*up]+=1j*amp/dx[axes]
-        if(bound=='periodic'):
+        if Runge_Kutta is None:
             for j in range(0,nbl):
-                for i in range(up-step,up):
-                    A1[i+j*up,i+j*up+step-up]+=-1j*amp/dx[axes]
-                    A1[i+j*up+step-up,i+j*up]+=1j*amp/dx[axes]
+                for i in range(0,up-step):
+                    A1[i+j*up,i+j*up+step]+=-1j*amp/dx[axes]/2
+                    A1[i+j*up+step,i+j*up]+=1j*amp/dx[axes]/2
+            if(bound=='periodic'):
+                for j in range(0,nbl):
+                    for i in range(up-step,up):
+                        A1[i+j*up,i+j*up+step-up]+=-1j*amp/dx[axes]/2
+                        A1[i+j*up+step-up,i+j*up]+=1j*amp/dx[axes]/2
+        else:
+            (popravka,M) = Runge_Kutta_coefs(M = Runge_Kutta)
+            for R in range(1,M+1):
+                for j in range(0,nbl):
+                    for i in range(0,up-step*R):
+                        A1[i+j*up,i+j*up+step*R]+=-1j*amp/dx[axes]/2*popravka[R-1]
+                        A1[i+j*up+step*R,i+j*up]+=1j*amp/dx[axes]/2*popravka[R-1]
+                if(bound=='periodic'):
+                    for j in range(0,nbl):
+                        for i in range(up-step*R,up):
+                            A1[i+j*up,i+j*up+step*R-up]+=-1j*amp/dx[axes]/2*popravka[R-1]
+                            A1[i+j*up+step*R-up,i+j*up]+=1j*amp/dx[axes]/2*popravka[R-1]
+                        
     # n**2 is -d2/dfi^2
     if(mode=='n**2'):
-        for i in range(0,A1.shape[0]):
-            A1[i,i]+=2*amp/dx[axes]**2
         for i in range(-(dimension.shape[0]-1),-axes):
             step=int(step*dimension[-i])
             up=int(up*dimension[-i-1])
         # nbl - number of these blocks
         nbl=A1.shape[0]//up
-        for j in range(0,nbl):
-            for i in range(0,up-step):
-                A1[i+j*up,i+j*up+step]+=-amp/dx[axes]**2
-                A1[i+j*up+step,i+j*up]+=-amp/dx[axes]**2
-        if(bound=='periodic'):
+        if Runge_Kutta is None:
+            for i in range(0,A1.shape[0]):
+                A1[i,i]+=2*amp/dx[axes]**2
             for j in range(0,nbl):
-                for i in range(up-step,up):
-                    A1[i+j*up,i+j*up+step-up]+=-amp/dx[axes]**2
-                    A1[i+j*up+step-up,i+j*up]+=-amp/dx[axes]**2
-    # nr here is 1j(a^+-a)
+                for i in range(0,up-step):
+                    A1[i+j*up,i+j*up+step]+=-amp/dx[axes]**2
+                    A1[i+j*up+step,i+j*up]+=-amp/dx[axes]**2
+            if(bound=='periodic'):
+                for j in range(0,nbl):
+                    for i in range(up-step,up):
+                        A1[i+j*up,i+j*up+step-up]+=-amp/dx[axes]**2
+                        A1[i+j*up+step-up,i+j*up]+=-amp/dx[axes]**2
+        else:
+            (popravka,M) = Runge_Kutta_coefs(pr = 2, M = Runge_Kutta)
+            for i in range(0,A1.shape[0]):
+                A1[i,i]+=amp/dx[axes]**2*popravka[0]
+            for R in range(1,M):
+                for j in range(0,nbl):
+                    for i in range(0,up-step*R):
+                        A1[i+j*up,i+j*up+step*R]+=-amp/dx[axes]**2*popravka[R]
+                        A1[i+j*up+step*R,i+j*up]+=-amp/dx[axes]**2*popravka[R]
+                if(bound=='periodic'):
+                    for j in range(0,nbl):
+                        for i in range(up-step*R,up):
+                            A1[i+j*up,i+j*up+step*R-up]+=-amp/dx[axes]**2*popravka[R]
+                            A1[i+j*up+step*R-up,i+j*up]+=-amp/dx[axes]**2*popravka[R]
+                    
+    # n*nr here is d/dfi*(a^+-a)
     if(mode=='n*nr'):
         for i in range(-(dimension.shape[0]-1),-axes):
             step=int(step*dimension[-i])
@@ -256,10 +294,10 @@ def fillingA(amp,A,dimension,dx,mode='n**2',bound='not',axes=0,axesr=0):
             for j in range(0,nbl):
                 for jr in range(0,nblr-step//upr):
                     for ir in range(0,upr-stepr):
-                        A1[j*up+ir+jr*upr,j*up+step+ir+jr*upr+stepr]+=-amp/dx[axes]*(ir//stepr+1)**0.5
-                        A1[j*up+step+ir+jr*upr+stepr,j*up+ir+jr*upr]+=-amp/dx[axes]*(ir//stepr+1)**0.5
-                        A1[j*up+step+ir+jr*upr,j*up+ir+jr*upr+stepr]+=amp/dx[axes]*(ir//stepr+1)**0.5
-                        A1[j*up+ir+jr*upr+stepr,j*up+step+ir+jr*upr]+=amp/dx[axes]*(ir//stepr+1)**0.5
+                        A1[j*up+ir+jr*upr,j*up+step+ir+jr*upr+stepr]+=-amp/dx[axes]*(ir//stepr+1)**0.5/2
+                        A1[j*up+step+ir+jr*upr+stepr,j*up+ir+jr*upr]+=-amp/dx[axes]*(ir//stepr+1)**0.5/2
+                        A1[j*up+step+ir+jr*upr,j*up+ir+jr*upr+stepr]+=amp/dx[axes]*(ir//stepr+1)**0.5/2
+                        A1[j*up+ir+jr*upr+stepr,j*up+step+ir+jr*upr]+=amp/dx[axes]*(ir//stepr+1)**0.5/2
         if (axesr<axes):
             # nbl - number of these blocks
             nblr=A1.shape[0]//upr
@@ -267,9 +305,113 @@ def fillingA(amp,A,dimension,dx,mode='n**2',bound='not',axes=0,axesr=0):
             for jr in range(0,nblr):
                 for j in range(0,nbl-stepr//up):
                     for i in range(0,up-step):
-                        A1[i+j*up+jr*upr,i+j*up+step+jr*upr+stepr]+=-amp/dx[axes]*((j*nbl)//stepr+1)**0.5
-                        A1[i+j*up+step+jr*upr+stepr,i+j*up+jr*upr]+=-amp/dx[axes]*((j*nbl)//stepr+1)**0.5
-                        A1[i+j*up+step+jr*upr,i+j*up+jr*upr+stepr]+=amp/dx[axes]*((j*nbl)//stepr+1)**0.5
-                        A1[i+j*up+jr*upr+stepr,i+j*up+step+jr*upr]+=amp/dx[axes]*((j*nbl)//stepr+1)**0.5
+                        A1[i+j*up+jr*upr,i+j*up+step+jr*upr+stepr]+=-amp/dx[axes]*((j*nbl)//stepr+1)**0.5/2
+                        A1[i+j*up+step+jr*upr+stepr,i+j*up+jr*upr]+=-amp/dx[axes]*((j*nbl)//stepr+1)**0.5/2
+                        A1[i+j*up+step+jr*upr,i+j*up+jr*upr+stepr]+=amp/dx[axes]*((j*nbl)//stepr+1)**0.5/2
+                        A1[i+j*up+jr*upr+stepr,i+j*up+step+jr*upr]+=amp/dx[axes]*((j*nbl)//stepr+1)**0.5/2
+    # n1*n2 here is -d2/dfi1dfi2
+    if (mode == 'n1*n2'):
+        if (axes == axesr):
+            print("axes and axesr must be different")
+            return None
+        if (axesr < axes):
+            axes1 = axes
+            axes = axesr
+            axesr = axes1
+        for i in range(-(dimension.shape[0] - 1), -axes):
+            step = int(step * dimension[-i])
+            up = int(up * dimension[-i - 1])
+        # stepr to describe displacemant of axesr's coordinate
+        stepr = 1
+        # upr - upper bound of my block in matrix for axesr's mode
+        upr = int(dimension[dimension.shape[0] - 1])
+        for i in range(-(dimension.shape[0] - 1), -axesr):
+            stepr = int(stepr * dimension[-i])
+            upr = int(upr * dimension[-i - 1])
+        if (axes < axesr):
+            # nbl - number of these blocks
+            nbl = A1.shape[0] // up
+            nblr = up // upr
+            for j in range(0, nbl):
+                for jr in range(0, nblr - step // upr):
+                    for ir in range(0, upr - stepr):
+                        A1[j * up + ir + jr * upr, j * up + step + ir + jr * upr + stepr] += -amp / dx[axes] / dx[axesr] / 4
+                        A1[j * up + step + ir + jr * upr + stepr, j * up + ir + jr * upr] += -amp / dx[axes] / dx[axesr] / 4
+                        A1[j * up + step + ir + jr * upr, j * up + ir + jr * upr + stepr] += amp / dx[axes] / dx[axesr] / 4
+                        A1[j * up + ir + jr * upr + stepr, j * up + step + ir + jr * upr] += amp / dx[axes] / dx[axesr] / 4
+            if(bound=='periodic'):
+                for j in range(0, nbl):
+                    for jr in range(nblr - step // upr, nblr):
+                        for ir in range(0, upr - stepr):
+                            A1[j * up + ir + jr * upr, j * up + step - up + ir + jr * upr + stepr] += -amp / dx[axes] / dx[
+                                axesr] / 4
+                            A1[j * up + step - up + ir + jr * upr + stepr, j * up + ir + jr * upr] += -amp / dx[axes] / dx[
+                                axesr] / 4
+                            A1[j * up + step - up + ir + jr * upr, j * up + ir + jr * upr + stepr] += amp / dx[axes] / dx[
+                                axesr] / 4
+                            A1[j * up + ir + jr * upr + stepr, j * up + step - up + ir + jr * upr] += amp / dx[axes] / dx[
+                                axesr] / 4
+                        for ir in range(upr - stepr, upr):
+                            A1[j * up + ir + jr * upr, j * up + step - up + ir + jr * upr + stepr - upr] += -amp / dx[axes] / dx[
+                                axesr] / 4
+                            A1[j * up + step - up + ir + jr * upr + stepr - upr, j * up + ir + jr * upr] += -amp / dx[axes] / dx[
+                                axesr] / 4
+                            A1[j * up + step - up + ir + jr * upr, j * up + ir + jr * upr + stepr - upr] += amp / dx[axes] / dx[
+                                axesr] / 4
+                            A1[j * up + ir + jr * upr + stepr - upr, j * up + step - up + ir + jr * upr] += amp / dx[axes] / dx[
+                                axesr] / 4
+                    for jr in range(0, nblr - step // upr):
+                        for ir in range(upr - stepr, upr):
+                            A1[j * up + ir + jr * upr, j * up + step + ir + jr * upr + stepr - upr] += -amp / dx[axes] / dx[
+                                axesr] / 4
+                            A1[j * up + step + ir + jr * upr + stepr - upr, j * up + ir + jr * upr] += -amp / dx[axes] / dx[
+                                axesr] / 4
+                            A1[j * up + step + ir + jr * upr, j * up + ir + jr * upr + stepr - upr] += amp / dx[axes] / dx[
+                                axesr] / 4
+                            A1[j * up + ir + jr * upr + stepr - upr, j * up + step + ir + jr * upr] += amp / dx[axes] / dx[
+                                axesr] / 4
+    # cos(phi) psi(i)=(psi(i+1)+psi(i-1))/2
+    if (mode == 'cos(phi)'):
+        if dx is not None:
+            print("Warning: It's tunelling operator in charge basis. There is no dx")
+        for i in range(-(dimension.shape[0] - 1), -axes):
+            step = int(step * dimension[-i])
+            up = int(up * dimension[-i - 1])
+        # nbl - number of these blocks
+        nbl = A1.shape[0] // up
+        for j in range(0, nbl):
+            for i in range(0, up - step):
+                A1[i + j * up, i + j * up + step] += 0.5 * amp
+                A1[i + j * up + step, i + j * up] += 0.5 * amp.conjugate()
+    # cos(phi_1-phi_2) psi(i,j)=(psi(i+1,j-1)+psi(i-1,j+1))/2
+    if (mode == 'cos(phi_1-phi_2)'):
+        if dx is not None:
+            print("Warning: It's tunelling operator in charge basis. There is no dx")
+        if (axesr < axes):
+            axes1 = axes
+            axes = axesr
+            axesr = axes1
+        for i in range(-(dimension.shape[0] - 1), -axes):
+            step = int(step * dimension[-i])
+            up = int(up * dimension[-i - 1])
+        # stepr to describe displacemant of axesr's coordinate
+        stepr = 1
+        # upr - upper bound of my block in matrix for resonator
+        upr = int(dimension[dimension.shape[0] - 1])
+        for i in range(-(dimension.shape[0] - 1), -axesr):
+            stepr = int(stepr * dimension[-i])
+            upr = int(upr * dimension[-i - 1])
+        if (axes == axesr):
+            print("axes and axesr must be different")
+            return None
+        if (axes < axesr):
+            # nbl - number of these blocks
+            nbl = A1.shape[0] // up
+            nblr = up // upr
+            for j in range(0, nbl):
+                for jr in range(0, nblr - step // upr):
+                    for ir in range(0, upr - stepr):
+                        A1[j * up + ir + jr * upr + step, j * up + ir + jr * upr + stepr] += amp / 2
+                        A1[j * up + ir + jr * upr + stepr, j * up + ir + jr * upr + step] += amp.conjugate() / 2
     return A1
 
