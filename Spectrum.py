@@ -415,3 +415,207 @@ def fillingA(amp,A,dimension,dx,mode='n**2',bound='not',axes=0,axesr=0, Runge_Ku
                         A1[j * up + ir + jr * upr + stepr, j * up + ir + jr * upr + step] += amp.conjugate() / 2
     return A1
 
+def make_state(desired,shapes):
+    """
+    Делает желаемое (desired) состояние общей системы из собственных состояний подсистем c размерностями shapes.
+    desired - список из номеров состояний каждой подсистем,
+    shapes - размерности каждой из подсистем.
+    """
+    f=1
+    for i in range(0,len(shapes)):
+        f1=np.linspace(0,0,shapes[i])
+        f1[desired[i]]=1
+        f=np.kron(f,f1)
+    return f
+
+def find_proper_levels(f_all,f):
+    """
+    Находит нужный собственный уровень системы по наиболее похожей собственной функции на заданную в аргумента f.
+    f_all - все собственные уровни системы,
+    f - желаемая функция.
+    """
+    a=0
+    j=0
+    for i in range(0,f_all.shape[1]):
+        b=abs(f_all[:,i]@f)
+        if b>a:
+            a=b
+            j=i
+    return j
+
+def transmon(Ec, Ej1, Ej2, N_max=30, z = np.linspace(-np.pi,0,101), r=7):
+    """
+        Расчет спектра трансмона в зарядовом базисе в зависимости от внешнего потока,
+        El, Ej1, Ej2 - энергетические параметры системы
+        N_max - максимальный заряд
+        z - внешний поток
+        r - номер максимального уровня в итоговом спектре"""
+    degrees=1
+    period=[0]
+    dim=np.asarray([N_max*2+1])
+    b=np.asarray([-N_max])
+    a=np.asarray([N_max])
+    (h,b)=spect.dividing(degrees,a,b,period,dim)
+    (fi,N)=spect.basis(degrees,dim,a,b)
+    m=z.shape[0]
+    B=np.zeros((r,m))
+    fm2=np.tensordot(linspace(0j,0,N),tensordot(linspace(0,0,r),linspace(0,0,m),axes=0),axes=0)
+    A0=np.tensordot(linspace(0j,0,N),linspace(0,0,N),axes=0)
+    for i in range(0,N):
+        A0[i,i]+=Ec*fi[i,0]**2/2
+    for k in range(0,m):
+        F=z[k]
+        A=copy.copy(A0)
+        A=spect.fillingA(-(Ej1+Ej2)*np.cos(F/2),A,dim,1,axes=0,mode='cos(phi)',bound='not')
+        A=spect.fillingA(-1j*(Ej1-Ej2)*np.sin(F/2),A,dim,1,axes=0,mode='cos(phi)',bound='not')
+        (B2,f)= scipy.sparse.linalg.eigsh(scipy.sparse.csr_matrix(A),k=r,which='SA',maxiter=4000)
+        l_order=np.argsort(np.real(B2))
+        B2=B2[l_order]
+        f=f[:,l_order]
+        B[:,k]=B2
+        fm2[:,:,k]=f
+    return (B,fm2,fi[:,0],h)
+
+def fluxonium(El, Ec, Ej,dim=100,z=np.linspace(-np.pi,0*np.pi,127),a=-6*np.pi,r=3,Runge_Kutta = 5):
+    """
+    Расчет спектра флаксониума в зависимости от внешнего потока
+    El, Ec, Ej - энергетические параметры системы
+    dim - размерность
+    z - внешний поток
+    а - граница области
+    r - номер максимального уровня
+    Runge_Kutta - порядок аппроксимации производных"""
+    # количество степеней свободы системы
+    degrees=1
+    # периодический ли потенциал (0 - нет, 1 - да)
+    period=[0]
+    # преобразование размерностей и границ в массив
+    dim=np.asarray([dim])
+    b=np.asarray([-a])
+    a=np.asarray([a])
+    # определение шага сетки и правой границы (для периодических граничных условий она немного сдвигается)
+    (h,b)=spect.dividing(degrees,a,b,period,dim)
+    # Построение базиса
+    (fi,N)=spect.basis(degrees,dim,a,b)
+    # Определение размерностей энергий и собственных функций и гамильтониана
+    m=z.shape[0]
+    B=np.zeros((r,m))
+    fm2=np.tensordot(linspace(0,0,N),tensordot(linspace(0,0,r),linspace(0,0,m),axes=0),axes=0)
+    # Построение неизменной для внешнего потока части гамильтониана
+    A0=np.tensordot(linspace(0,0,N),linspace(0,0,N),axes=0)
+    A0=spect.fillingA(Ec/2,A0,dim,h,axes=0,Runge_Kutta = Runge_Kutta)
+    for i in range(0,N):
+        A0[i,i]+=Ej*(1-np.cos(fi[i,0]))
+    # Цикл по внешнему потоку
+    for k in range(0,m):
+        F=z[k]
+        A=copy.copy(A0)
+        # Построение зависимой от внешнего потока части гамильтониана
+        for i in range(0,N):
+            A[i,i]+=El*(fi[i,0]-F)**2/2
+        # Диагонализация Гамильтониана
+        (B2,f)= scipy.sparse.linalg.eigsh(scipy.sparse.csr_matrix(A),k=r,which='SA',maxiter=4000)
+        # Его сортировка
+        l_order=np.argsort(np.real(B2))
+        B2=B2[l_order]
+        f=f[:,l_order]
+        B[:,k]=B2
+        fm2[:,:,k]=f
+    return (B,fm2,fi[:,0],h)
+
+def charge_elements(f,dim,h,Runge_Kutta = 5):
+    """
+    Расчет матричных элементов заряда для одномерной задачи,
+    f - волновые функции,
+    dim - размерность системы,
+    h - шаг сетки,
+    Runge_Kutta - порядок аппроксимации производной"""
+    A0=np.diag(np.linspace(0j,0,dim))
+    A0=spect.fillingA(1,A0,np.asarray([dim]),h,mode='n',axes=0,Runge_Kutta = Runge_Kutta)
+    return np.einsum('imk,il,ljk->mjk',f,A0,f.conjugate())
+
+def flux_elements(f,fi):
+    """
+    Расчет матричных элементов потока для одномерной задачи,
+    f - волновые функции,
+    fi - базисный вектор"""
+    return np.einsum('imk,il,ljk->mjk',f,np.diag(fi),f.conjugate())
+
+def delete_global_phase(fm2):
+    """
+    Делает так, чтобы не было скачков глобальной фазы при изменении внешнего потока у собственных функций
+     fm2 - собственные функции, зависящие от внешнего потока.
+     Первый индекс - номер точки разбиения по обобщенной координате, второй индекс - номер уровня, третий - номер потока"""
+    f=copy.copy(fm2)
+    for lvl in range(0,fm2.shape[1]):
+        for fl in range(1,fm2.shape[2]):
+            if f[:,lvl,fl]@f[:,lvl,fl-1]<0:
+                f[:,lvl,fl]=-f[:,lvl,fl]
+    return f
+
+def dispersive_shift(B,n,n_r,B_r,Ec2,r=5):
+    """
+    Рассчитывает общий спектр двух систем в зависимости от одного параметра. От параметра зависит только первая система
+    B - спектр первой системы, зависимость от параметра - его вторая ось
+    n - матричные элементы первой системы,
+    n_r - матричные элементы второй системы,
+    B_r - спектр второй системы,
+    Ec2 - коэффициент связи (входит в гамильтониан как коэффициент перед произведением матричных элементов двух систем)
+    """
+    B_disp=[]
+    f_disp=[]
+    for i in range(B.shape[1]):
+        E=np.diag(np.linspace(1,1,B.shape[0]))
+        E_r=np.diag(np.linspace(1,1,B_r.shape[0]))
+        Energies=[]
+        f_all=[]
+        H_q=np.diag(B[:,i]-B[0,i])
+        H_r=np.diag(B_r[:]-B_r[0])
+        H1=np.kron(H_q,E_r)
+        H2=np.kron(E,H_r)
+        n1=np.kron(n[:,:,i],E_r)
+        n2=np.kron(E,n_r)
+        H=H1+H2+Ec2*n1@n2
+        (B2,f)= scipy.sparse.linalg.eigsh(scipy.sparse.csr_matrix(H),k=r,which='SA',maxiter=4000)
+        l_order=np.argsort(np.real(B2))
+        f=f[:,l_order]
+        B_disp.append(B2[l_order])
+        f_disp.append(f)
+    return (np.asarray(B_disp),np.asarray(f_disp))
+
+def disp_shift_plot(w,C,Cc,B,n,r_r,z,r=10):
+    """
+    Рассчитывает и строит дисперсионный сдвиг резонатора,
+    Параметры:
+    w - частота резонатора,
+    С - емкость кубита
+    Сс - емкость связи
+    B -  спектр кубита в зависимости от внешнего потока
+    n - оператор числа куперовских пар (матричнй вид)
+    r_r - количество уровней учитываемых в резонаторе
+    z - массив внешних потоков
+    r -  число уровней кубита, учитываемых в расчете
+    """
+    g=make_g(w,Cc,C-Cc)
+    B_r=np.linspace(0,(r_r-1)*w,r_r)
+    n_r=-1j*(np.diag(np.linspace(1,(r_r-1),(r_r-1))**0.5,k=1)-np.diag(np.linspace(1,(r_r-1),(r_r-1))**0.5,k=-1))
+    B_disp,f_disp=dispersive_shift(B[:r,:],n[:r,:r,:],n_r,B_r,g,r=10)
+    fr=[]
+    fr_1=[]
+    for i in range(0,f_disp.shape[0]):
+        fr.append(B_disp[i,find_proper_levels(f_disp[i],make_state([0,1],[r,r_r]))]-B_disp[i,0])
+        fr_1.append(B_disp[i,find_proper_levels(f_disp[i],make_state([1,1],[r,r_r]))]-
+                    B_disp[i,find_proper_levels(f_disp[i],make_state([1,0],[r,r_r]))])
+    fr=np.asarray(fr)
+    fr_1=np.asarray(fr_1)
+    print((fr_1-fr)[0]*1e3)
+    fig=plt.figure(figsize=(8,4))
+    size=13
+    plt.tick_params(labelsize = size)
+    plt.plot(z/2/np.pi,(fr_1-fr)*1e3)
+    plt.xlabel(r'$\Phi^{ext}/\Phi_0$',fontsize=size)
+    plt.ylabel(r'$\chi_{01}$, МГЦ',fontsize=size)
+    plt.title(r'Дисперсионный сдвиг')
+    plt.tight_layout()
+
+
