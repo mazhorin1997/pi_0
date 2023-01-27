@@ -529,7 +529,7 @@ def fluxonium(El, Ec, Ej,dim=100,z=np.linspace(-np.pi,0*np.pi,127),a=-6*np.pi,r=
         f=f[:,l_order]
         B[:,k]=B2
         fm2[:,:,k]=f
-    n = charge_elements(fm2,dim,h,Runge_Kutta = Runge_Kutta)
+    n = charge_elements(fm2,dim[0],h,Runge_Kutta = Runge_Kutta)
     phi = flux_elements(fm2,fi[:,0])
     return (B,fm2,fi[:,0],h,n,phi)
 
