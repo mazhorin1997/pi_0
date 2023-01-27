@@ -455,8 +455,8 @@ def transmon(Ec, Ej1, Ej2, N_max=30, z = np.linspace(-np.pi,0,101), r=7):
     dim=np.asarray([N_max*2+1])
     b=np.asarray([-N_max])
     a=np.asarray([N_max])
-    (h,b)=spect.dividing(degrees,a,b,period,dim)
-    (fi,N)=spect.basis(degrees,dim,a,b)
+    (h,b)=dividing(degrees,a,b,period,dim)
+    (fi,N)=basis(degrees,dim,a,b)
     m=z.shape[0]
     B=np.zeros((r,m))
     fm2=np.tensordot(linspace(0j,0,N),tensordot(linspace(0,0,r),linspace(0,0,m),axes=0),axes=0)
@@ -466,8 +466,8 @@ def transmon(Ec, Ej1, Ej2, N_max=30, z = np.linspace(-np.pi,0,101), r=7):
     for k in range(0,m):
         F=z[k]
         A=copy.copy(A0)
-        A=spect.fillingA(-(Ej1+Ej2)*np.cos(F/2),A,dim,1,axes=0,mode='cos(phi)',bound='not')
-        A=spect.fillingA(-1j*(Ej1-Ej2)*np.sin(F/2),A,dim,1,axes=0,mode='cos(phi)',bound='not')
+        A=fillingA(-(Ej1+Ej2)*np.cos(F/2),A,dim,1,axes=0,mode='cos(phi)',bound='not')
+        A=fillingA(-1j*(Ej1-Ej2)*np.sin(F/2),A,dim,1,axes=0,mode='cos(phi)',bound='not')
         (B2,f)= scipy.sparse.linalg.eigsh(scipy.sparse.csr_matrix(A),k=r,which='SA',maxiter=4000)
         l_order=np.argsort(np.real(B2))
         B2=B2[l_order]
@@ -478,13 +478,21 @@ def transmon(Ec, Ej1, Ej2, N_max=30, z = np.linspace(-np.pi,0,101), r=7):
 
 def fluxonium(El, Ec, Ej,dim=100,z=np.linspace(-np.pi,0*np.pi,127),a=-6*np.pi,r=3,Runge_Kutta = 5):
     """
-    Расчет спектра флаксониума в зависимости от внешнего потока
+    Расчет спектра флаксониума в зависимости от внешнего потока.
     El, Ec, Ej - энергетические параметры системы
     dim - размерность
     z - внешний поток
     а - граница области
     r - номер максимального уровня
-    Runge_Kutta - порядок аппроксимации производных"""
+    Runge_Kutta - порядок аппроксимации производных
+    Выходные данные
+    B - энергии в зависимости от внешнего потока
+    fm2 - волновые функции в зависимости от внешнего потока,
+    fi[:,0] - базисный вектор
+    h - шаг по сетке
+    n - матричные элементы заряда в зависимости от внешнего потока
+    phi - матричные элементы потока в зависимости от внешнего потока
+    """
     # количество степеней свободы системы
     degrees=1
     # периодический ли потенциал (0 - нет, 1 - да)
@@ -494,16 +502,16 @@ def fluxonium(El, Ec, Ej,dim=100,z=np.linspace(-np.pi,0*np.pi,127),a=-6*np.pi,r=
     b=np.asarray([-a])
     a=np.asarray([a])
     # определение шага сетки и правой границы (для периодических граничных условий она немного сдвигается)
-    (h,b)=spect.dividing(degrees,a,b,period,dim)
+    (h,b)=dividing(degrees,a,b,period,dim)
     # Построение базиса
-    (fi,N)=spect.basis(degrees,dim,a,b)
+    (fi,N)=basis(degrees,dim,a,b)
     # Определение размерностей энергий и собственных функций и гамильтониана
     m=z.shape[0]
     B=np.zeros((r,m))
     fm2=np.tensordot(linspace(0,0,N),tensordot(linspace(0,0,r),linspace(0,0,m),axes=0),axes=0)
     # Построение неизменной для внешнего потока части гамильтониана
     A0=np.tensordot(linspace(0,0,N),linspace(0,0,N),axes=0)
-    A0=spect.fillingA(Ec/2,A0,dim,h,axes=0,Runge_Kutta = Runge_Kutta)
+    A0=fillingA(Ec/2,A0,dim,h,axes=0,Runge_Kutta = Runge_Kutta)
     for i in range(0,N):
         A0[i,i]+=Ej*(1-np.cos(fi[i,0]))
     # Цикл по внешнему потоку
@@ -521,7 +529,11 @@ def fluxonium(El, Ec, Ej,dim=100,z=np.linspace(-np.pi,0*np.pi,127),a=-6*np.pi,r=
         f=f[:,l_order]
         B[:,k]=B2
         fm2[:,:,k]=f
-    return (B,fm2,fi[:,0],h)
+    n = charge_elements(fm2,dim,h,Runge_Kutta = Runge_Kutta):
+    phi = flux_elements(fm2,fi[:,0])
+    return (B,fm2,fi[:,0],h,n,phi)
+
+
 
 def charge_elements(f,dim,h,Runge_Kutta = 5):
     """
@@ -531,7 +543,7 @@ def charge_elements(f,dim,h,Runge_Kutta = 5):
     h - шаг сетки,
     Runge_Kutta - порядок аппроксимации производной"""
     A0=np.diag(np.linspace(0j,0,dim))
-    A0=spect.fillingA(1,A0,np.asarray([dim]),h,mode='n',axes=0,Runge_Kutta = Runge_Kutta)
+    A0=fillingA(1,A0,np.asarray([dim]),h,mode='n',axes=0,Runge_Kutta = Runge_Kutta)
     return np.einsum('imk,il,ljk->mjk',f,A0,f.conjugate())
 
 def flux_elements(f,fi):
@@ -617,5 +629,6 @@ def disp_shift_plot(w,C,Cc,B,n,r_r,z,r=10):
     plt.ylabel(r'$\chi_{01}$, МГЦ',fontsize=size)
     plt.title(r'Дисперсионный сдвиг')
     plt.tight_layout()
+
 
 
