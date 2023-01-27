@@ -465,7 +465,7 @@ def transmon(Ec, Ej1, Ej2, N_max=30, z = np.linspace(-np.pi,0,101), r=7):
         A0[i,i]+=Ec*fi[i,0]**2/2
     for k in range(0,m):
         F=z[k]
-        A=copy.copy(A0)
+        A=copy(A0)
         A=fillingA(-(Ej1+Ej2)*np.cos(F/2),A,dim,1,axes=0,mode='cos(phi)',bound='not')
         A=fillingA(-1j*(Ej1-Ej2)*np.sin(F/2),A,dim,1,axes=0,mode='cos(phi)',bound='not')
         (B2,f)= scipy.sparse.linalg.eigsh(scipy.sparse.csr_matrix(A),k=r,which='SA',maxiter=4000)
@@ -517,7 +517,7 @@ def fluxonium(El, Ec, Ej,dim=100,z=np.linspace(-np.pi,0*np.pi,127),a=-6*np.pi,r=
     # Цикл по внешнему потоку
     for k in range(0,m):
         F=z[k]
-        A=copy.copy(A0)
+        A=copy(A0)
         # Построение зависимой от внешнего потока части гамильтониана
         for i in range(0,N):
             A[i,i]+=El*(fi[i,0]-F)**2/2
@@ -558,7 +558,7 @@ def delete_global_phase(fm2):
     Делает так, чтобы не было скачков глобальной фазы при изменении внешнего потока у собственных функций
      fm2 - собственные функции, зависящие от внешнего потока.
      Первый индекс - номер точки разбиения по обобщенной координате, второй индекс - номер уровня, третий - номер потока"""
-    f=copy.copy(fm2)
+    f=copy(fm2)
     for lvl in range(0,fm2.shape[1]):
         for fl in range(1,fm2.shape[2]):
             if f[:,lvl,fl]@f[:,lvl,fl-1]<0:
