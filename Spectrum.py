@@ -1,13 +1,13 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import math as math
-import pickle
 import scipy
 from scipy.sparse.linalg import eigs
 from numpy.linalg import inv,norm,eig
 from numpy import linspace,cos,shape,tensordot,einsum,diag,kron
 from math import pi
 from copy import copy
+import itertools
 
 
 # Заполнение матрицы ёмкостей или индуктивностей
@@ -722,3 +722,77 @@ def Unite_systems(B, n, g, t=None, r=20):
         Energies.append(C[l_order])
     return (np.asarray(Energies), np.asarray(wave_functions))
 
+
+def find_energy(Energies, f_all, f):
+    """
+    Выдает энергию состояния наиболее похожего на целевое состояние для различных значений параметра
+        (например внешнего потока).
+    Используется для определения состояний в заранее диагонализованных, а затем связанных систем.
+
+    Energies - массив энергий (первый индекс - зависимость от параметра, второй - номер уровня)
+    f_all - массив волновых функций (первый индекс - зависимость от параметра,
+        второй - положение на сетке,третий - номер уровня)
+    f - волновая функция целевого состояния
+    Вывод: Energie, index
+    Energie - массив с нужным уровенем в зависимости от параметра
+    index - список индексов, соответствующих нужному уровню в Energies, для различных значений параметра
+    """
+    Energie = []
+    index = []
+    for i in range(0, Energies.shape[0]):
+        j = find_proper_levels(f_all[i], f)
+        Energie.append(Energies[i, j])
+        index.append(j)
+    return np.asarray(Energie), index
+
+
+def find_all_energies(Energies, f_all, N_sys, state_max, n_lvls):
+    """
+    Выдает энергии первых состояний в зависимости от параметра (например, внешнего потока).
+    Используется для определения состояний в заранее диагонализованных, а затем связанных систем.
+
+    Energies - массив энергий (первый индекс - зависимость от параметра, второй - номер уровня)
+    f_all - массив волновых функций (первый индекс - зависимость от параметра,
+        второй - положение на сетке,третий - номер уровня)
+    N_sys - количество связываемых систем
+    state_max - список максимальных номеров уровней для различных подсистем,
+        если число - то максимальные уровни одинаковы для каждой подсистемы
+    n_lvls - список размерностей каждой подсистемы, если число, то одинаково для всех подсистем
+    Вывод: (Energie,indexes)
+    Energie - словарь с энергиями, зависящими от параметра. Ключи - номера уровней
+        (например, для основного состояния трех связанных подсистем ключ такой :'0_0_0')
+    indexes - словарь с индексами, соответствующим положению уровня в массиве Energies
+        (формат ключей такой же, как для Energie)
+    """
+    f_all_new = copy(f_all)
+    if type(state_max) is int:
+        state_max = [state_max] * N_sys
+    if type(n_lvls) is int:
+        n_lvls = [n_lvls] * N_sys
+    if len(state_max) != N_sys or len(n_lvls) != N_sys:
+        print("ERROR: Не совпадает количество подсистем и размернось state_max или n_lvls")
+    states = list(
+        map(lambda x: list(map(int, x)), list(itertools.product(*list(map(lambda x: list(np.linspace(0, x, x + 1)),
+                                                                          state_max))))))
+    desired_states = list(map(lambda x: make_state(x, n_lvls), states))
+    Energie = {}
+    indexes = {}
+    keys = []
+    for state in states:
+        key = ''
+        for i in range(len(state)):
+            if i != 0:
+                key += '_'
+            key += str(state[i])
+        keys.append(key)
+        Energie[key] = []
+        indexes[key] = []
+    for i in range(0, Energies.shape[0]):
+        for j in range(0, len(desired_states)):
+            k = find_proper_levels(f_all_new[i], desired_states[j])
+            f_all_new[i, :, k] *= 0
+            indexes[keys[j]].append(k)
+            Energie[keys[j]].append(Energies[i, k])
+    for key in keys:
+        Energie[key] = np.asarray(Energie[key])
+    return (Energie, indexes)
