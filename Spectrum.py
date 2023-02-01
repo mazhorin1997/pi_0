@@ -751,9 +751,11 @@ def find_all_energies(Energies, f_all, N_sys, state_max, n_lvls):
     Выдает энергии первых состояний в зависимости от параметра (например, внешнего потока).
     Используется для определения состояний в заранее диагонализованных, а затем связанных систем.
 
-    Energies - массив энергий (первый индекс - зависимость от параметра, второй - номер уровня)
+    Energies - массив энергий (первый индекс - зависимость от параметра, второй - номер уровня),
+        если нет зависимости от параметра, то массив одномерный.
     f_all - массив волновых функций (первый индекс - зависимость от параметра,
-        второй - положение на сетке,третий - номер уровня)
+        второй - положение на сетке,третий - номер уровня),
+        если нет зависимости от параметра, массив двумерный
     N_sys - количество связываемых систем
     state_max - список максимальных номеров уровней для различных подсистем,
         если число - то максимальные уровни одинаковы для каждой подсистемы
@@ -764,7 +766,14 @@ def find_all_energies(Energies, f_all, N_sys, state_max, n_lvls):
     indexes - словарь с индексами, соответствующим положению уровня в массиве Energies
         (формат ключей такой же, как для Energie)
     """
-    f_all_new = copy(f_all)
+    if len(Energies.shape) == 2 and len(f_all.shape) == 3:
+        New_Energies = copy(Energies)
+        f_all_new = np.asarray(copy(f_all))
+    elif len(Energies.shape) == 1 and len(f_all.shape) == 2:
+        New_Energies = np.asarray([copy(Energies)])
+        f_all_new = np.asarray([copy(f_all)])
+    else:
+        print("ERROR неправильные размерности Energies и f_all")
     if type(state_max) is int:
         state_max = [state_max] * N_sys
     if type(n_lvls) is int:
@@ -787,12 +796,12 @@ def find_all_energies(Energies, f_all, N_sys, state_max, n_lvls):
         keys.append(key)
         Energie[key] = []
         indexes[key] = []
-    for i in range(0, Energies.shape[0]):
+    for i in range(0, New_Energies.shape[0]):
         for j in range(0, len(desired_states)):
             k = find_proper_levels(f_all_new[i], desired_states[j])
             f_all_new[i, :, k] *= 0
             indexes[keys[j]].append(k)
-            Energie[keys[j]].append(Energies[i, k])
+            Energie[keys[j]].append(New_Energies[i, k])
     for key in keys:
         Energie[key] = np.asarray(Energie[key])
     return (Energie, indexes)
