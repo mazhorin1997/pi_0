@@ -194,8 +194,8 @@ def fillingA(amp,A,dimension,dx,mode='n**2',bound='not',axes=0,axesr=0, Runge_Ku
     if bound!='not' and bound!='periodic' :
         print("wrong bounds, bounds should be not or periodic")
         return None
-    if(amp!=abs(amp) and amp!=-abs(amp) and mode!='cos(phi)' and mode!='cos(phi_1-phi_2)'):
-        print('Warning: For flux basis amp should be real to make the hamiltonian hermitian')
+    #if(amp!=abs(amp) and amp!=-abs(amp) and mode!='cos(phi)' and mode!='cos(phi_1-phi_2)'):
+        #print('Warning: For flux basis amp should be real to make the hamiltonian hermitian')
     if(mode!='n**2'and mode!='n' and mode!='n*nr' and mode!='cos(phi)' and mode!='cos(phi_1-phi_2)' and mode!='n1*n2'):
         print('Wrong mode: mode should be n**2 or n or n*nr or cos(phi) or cos(phi_1-phi_2)')
         return None
@@ -443,7 +443,7 @@ def find_proper_levels(f_all,f):
             j=i
     return j
 
-def transmon(Ec, Ej1, Ej2, N_max=30, z = np.linspace(-np.pi,0,101), r=7):
+def transmon(Ec, Ej1, Ej2, N_max=30, z = np.linspace(-np.pi,0,2), r=7):
     """
         Расчет спектра трансмона в зарядовом базисе в зависимости от внешнего потока,
         Ec, Ej1, Ej2 - энергетические параметры системы (Гамильтониан системы надо понятно записать: H=Ec*n**2/2-Ej1*cos(phi)-Ej2*sin(phi))
@@ -482,7 +482,7 @@ def transmon(Ec, Ej1, Ej2, N_max=30, z = np.linspace(-np.pi,0,101), r=7):
         fm2[:,:,k]=f
     return (B,fm2,fi[:,0],h)
 
-def fluxonium(El, Ec, Ej,dim=100,z=np.linspace(-np.pi,0*np.pi,127),a=-6*np.pi,r=3,Runge_Kutta = 5):
+def fluxonium(El, Ec, Ej,dim=100,z=np.linspace(-np.pi,-np.pi,1),a=-6*np.pi,r=3,Runge_Kutta = 5):
     """
     Расчет спектра флаксониума в зависимости от внешнего потока.
     El, Ec, Ej - энергетические параметры системы (Гамильтониан системы: H = 0.5*El*(phi-phi0)**2+0.5*Ec*n**2+Ej*(1-cos(phi)))
@@ -543,7 +543,7 @@ def fluxonium(El, Ec, Ej,dim=100,z=np.linspace(-np.pi,0*np.pi,127),a=-6*np.pi,r=
 
 def charge_elements(f,dim,h,Runge_Kutta = 5):
     """
-    Расчет матричных элементов заряда для одномерной задачи,
+    Расчет матричных элементов заряда в потоковом базисе для одномерной задачи (если базис зарядовый, то будут рассчитаны потоковые элементы),
     f - волновые функции,
     dim - размерность системы,
     h - шаг сетки,
@@ -554,7 +554,7 @@ def charge_elements(f,dim,h,Runge_Kutta = 5):
 
 def flux_elements(f,fi):
     """
-    Расчет матричных элементов потока для одномерной задачи,
+    Расчет матричных элементов потока в потоковом базисе для одномерной задачи (если базис зарядовый, то будут рассчитаны зарядовые элементы),
     f - волновые функции,
     fi - базисный вектор"""
     return np.einsum('imk,il,ljk->mjk',f,np.diag(fi),f.conjugate())
@@ -671,7 +671,7 @@ def multikron_multimatrix(B):
     return result
 
 
-def Unite_systems(B, n, g, t=None, r=20):
+def Unite_systems(B, n, g, t=None, r=20, mode = None):
     """
     Рассчитывает общий Гамильтониан системы
     B - список энергий отдельных систем
@@ -679,6 +679,8 @@ def Unite_systems(B, n, g, t=None, r=20):
     g - связи между системами (пример заполнения: [g01,g02,g12])
     t - список перестраиваемых элементов
     r -  номер последнего вычисляемого уровня энергии
+    mode - влияет на выдачу, ниже написан стандартный выход,
+        если mode == 'Hamiltonian', то выход: Гамильтониан общей системы
     Выход: (Energies, wavefunctions)
     Energies - собственные энергии
     wavefunctions - собственные функции
@@ -694,6 +696,7 @@ def Unite_systems(B, n, g, t=None, r=20):
         check = 1
         t = [0]
         B[0] = np.tensordot(B[0], [1], axes=0)
+        n[0] = np.tensordot(n[0], [1], axes=0)
 
     Energies = []
     wave_functions = []
@@ -712,6 +715,8 @@ def Unite_systems(B, n, g, t=None, r=20):
             for k in range(j + 1, len(H_e)):
                 H += g[m] * M_e[j] @ M_e[k]
                 m += 1
+        if mode == 'Hamiltonian':
+            return H
         if r < H.shape[0] / 2:
             (C, f) = scipy.sparse.linalg.eigsh(scipy.sparse.csr_matrix(H), k=r, which='SA', maxiter=4000)
         else:
