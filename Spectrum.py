@@ -159,10 +159,10 @@ def basis(degrees,dim,a,b):
 def Runge_Kutta_coefs(pr = 1, M=1):
     """
     pr - какая производная приближается,
-    M - до какого порядка (порядок по дефолту выбирается минимальным),
+    M - до какого порядка (порядок по дефолту выбирается минимальным, порядок аппроксимации о(2М)),
     
     Идея такая:нечетные производные расскладываются по разности функций +дельта и -дельта,
-    четные - по сумме и не сдвинутой функции"""
+    четные - по сумме и несдвинутой функции"""
     M = max(M, pr//2+1)
     b = np.asarray([0]*(pr//2)+[math.factorial(pr)/2]+[0]*(M-pr//2-1))
     n = np.linspace(1,M,M)
@@ -179,7 +179,7 @@ def Runge_Kutta_coefs(pr = 1, M=1):
     return (np.linalg.solve(A,b),M)
 
 
-def fillingA(amp,A,dimension,dx,mode='n**2',bound='not',axes=0,axesr=0, Runge_Kutta = None):
+def fillingA(amp,A,dimension,dx = None,mode='n**2',bound='not',axes=0,axesr=0, Runge_Kutta = None):
     """
     calculate matrix in flux basis for n^2, n*nr (where nr - charge for resonator), n or cos(phi) and cos(phi_1-phi_2) in charge basis, periodic and nonperiodic conditions,
     for different axeses and axes for resonator(axesr),
@@ -472,8 +472,8 @@ def transmon(Ec, Ej1, Ej2, N_max=30, z = np.linspace(-np.pi,0,2), r=7):
     for k in range(0,m):
         F=z[k]
         A=copy(A0)
-        A=fillingA(-(Ej1+Ej2)*np.cos(F/2),A,dim,1,axes=0,mode='cos(phi)',bound='not')
-        A=fillingA(-1j*(Ej1-Ej2)*np.sin(F/2),A,dim,1,axes=0,mode='cos(phi)',bound='not')
+        A=fillingA(-(Ej1+Ej2)*np.cos(F/2),A,dim,dx=None,axes=0,mode='cos(phi)',bound='not')
+        A=fillingA(-1j*(Ej1-Ej2)*np.sin(F/2),A,dim,dx=None,axes=0,mode='cos(phi)',bound='not')
         (B2,f)= scipy.sparse.linalg.eigsh(scipy.sparse.csr_matrix(A),k=r,which='SA',maxiter=4000)
         l_order=np.argsort(np.real(B2))
         B2=B2[l_order]
